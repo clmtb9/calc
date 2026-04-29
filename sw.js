@@ -2,6 +2,7 @@ const CACHE_NAME = 'numworks-v1';
 const ASSETS = [
   'index.html',
   'manifest.json',
+  'icon-512.png',
   'https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.0/math.js',
   'https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&family=Outfit:wght@300;400;500;600&display=swap'
 ];
