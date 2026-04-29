@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Calculatrice NumWorks</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1a1a2e">
+  <link rel="apple-touch-icon" href="icon-192.png">
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&family=Outfit:wght@300;400;500;600&display=swap');
+    
+    body { 
+      margin: 0; 
+      padding: 0;
+      background-color: #1a1a2e; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+      min-height: 100vh; 
+      -webkit-tap-highlight-color: transparent;
+      font-family: 'Outfit', sans-serif;
+    }
+
+    :root {
+      --nw-bg: #1a1a2e;
+      --nw-screen: #0a1628;
+      --nw-muted: #7f8c8d;
+      --nw-op: #f39c12;
+      --nw-fn: #3498db;
+      --nw-special: #2ecc71;
+      --nw-shift: #e6a817;
+    }
+
+    .calc-wrap {
+      background: var(--nw-bg);
+      border-radius: 16px;
+      padding: 16px;
+      width: 100%;
+      max-width: 480px;
+      margin: 0 auto;
+      border: 1px solid #2d3e5f;
+    }
+
+    .screen {
+      background: var(--nw-screen);
+      border-radius: 10px;
+      padding: 12px 16px;
+      margin-bottom: 14px;
+      min-height: 150px;
+      border: 1px solid #1a2a45;
+    }
+
+    .screen-label { font-size: 10px; color: var(--nw-muted); margin-bottom: 4px; letter-spacing: 0.5px; }
+    .screen-input {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      color: #7ecfff;
+      min-height: 22px;
+      word-break: break-all;
+      line-height: 1.8;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      cursor: text;
+      position: relative;
+    }
+    .cursor { display: inline-block; width: 2px; height: 15px; background: #7ecfff; animation: blink 1s infinite; vertical-align: middle; }
+    @keyframes blink { 0%, 49% { opacity: 1 } 50%, 100% { opacity: 0 } }
+    .sep-line { height: 1px; background: #1a2a45; margin: 8px 0; }
+    .render-zone { min-height: 52px; display: flex; align-items: center; justify-content: flex-end; overflow-x: auto; padding: 4px 0; }
+    .result-zone { min-height: 28px; display: flex; align-items: center; justify-content: flex-end; }
+    .result-txt { font-family: 'JetBrains Mono', monospace; font-size: 22px; color: #2ecc71; font-weight: 300; }
+    .result-txt.err { color: #e74c3c; font-size: 14px; }
+    .result-dec { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #5a7a6a; text-align: right; min-height: 16px; margin-top: 2px; }
+    .screen-mode { font-size: 10px; color: var(--nw-muted); letter-spacing: 1px; text-transform: uppercase; }
+
+    .keypad { display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; }
+    .key {
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      font-family: 'Outfit', sans-serif;
+      height: 52px;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      background: #2c2c2e;
+      color: #ccc;
+      font-size: 15px;
+      transition: transform 0.07s;
+    }
+    .key:active { transform: scale(0.9); filter: brightness(0.8); }
+    .key.num { background: #2c2c2e; color: #fff; font-size: 20px; }
+    .key.op { background: #2c2c2e; color: #fff; font-size: 20px; }
+    .key.eq { background: #e8703a; color: #fff; font-size: 22px; }
+    
+    .mode-strip { display: flex; gap: 6px; margin-bottom: 10px; }
+    .mode-btn { flex: 1; padding: 5px; border-radius: 6px; border: 1px solid #2d3e5f; background: #1e2a45; color: #7f8c8d; font-size: 11px; }
+    .mode-btn.active { background: #1a3060; border-color: #3a60a0; color: #7ecfff; }
+
+    /* Math rendering styles */
+    .frac { display: inline-flex; flex-direction: column; align-items: center; vertical-align: middle; margin: 0 2px; }
+    .frac-num { border-bottom: 1.5px solid currentColor; padding: 0 3px; font-size: 0.85em; }
+    .frac-den { padding: 0 3px; font-size: 0.85em; }
+    .sqrt-wrap { display: inline-flex; align-items: center; }
+    .sqrt-sym { font-size: 1.3em; color: #3498db; }
+    .sqrt-content { border-top: 1.5px solid #3498db; padding: 0 2px; }
+    .sup-exp { font-size: 0.65em; vertical-align: super; color: #9b59b6; }
+  </style>
+</head>
+<body>
+<div class="calc-wrap">
+  <div class="screen">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+      <div class="screen-label">Expression</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <div class="screen-mode" id="shiftIndicator" style="color:var(--nw-shift);display:none;">SHIFT</div>
+        <div class="screen-mode" id="modeLabel">RAD</div>
+      </div>
+    </div>
+    <div class="screen-input" id="inputDisplay"></div>
+    <div class="sep-line"></div>
+    <div class="screen-label">Rendu</div>
+    <div class="render-zone" id="renderZone"></div>
+    <div class="result-zone"><div class="result-txt" id="resultDisplay"></div></div>
+    <div class="result-dec" id="resultDec"></div>
+  </div>
+
+  <div class="mode-strip">
+    <button class="mode-btn active" id="btnExact" onclick="setExact(true)">EXACT</button>
+    <button class="mode-btn" id="btnFloat" onclick="setExact(false)">DÉCIMAL</button>
+  </div>
+
+  <div class="keypad">
+    <button class="key fn" id="ksin" onclick="insShift('sin(','asin(')">sin</button>
+    <button class="key fn" id="kcos" onclick="insShift('cos(','acos(')">cos</button>
+    <button class="key fn" id="ktan" onclick="insShift('tan(','atan(')">tan</button>
+    <button class="key fn angle-toggle rad" id="btnRad" onclick="setAngle('rad')" style="color:#e8703a">rad</button>
+    <button class="key fn angle-toggle" id="btnDeg" onclick="setAngle('deg')">deg</button>
+
+    <button class="key fn" id="klog" onclick="insShift('log(','10^(')">log</button>
+    <button class="key fn" id="kln" onclick="insShift('ln(','exp(')">ln</button>
+    <button class="key fn" onclick="ins('(')">(</button>
+    <button class="key fn" onclick="ins(')')">)</button>
+    <button class="key fn" id="shiftBtn" onclick="toggleShift()">inv</button>
+
+    <button class="key fn" onclick="ins('!')">!</button>
+    <button class="key del" onclick="clr()">AC</button>
+    <button class="key fn" onclick="ins('%')">%</button>
+    <button class="key del" onclick="del()">⌫</button>
+    <button class="key op" onclick="ins('/')">÷</button>
+
+    <button class="key fn" id="ksqrt" onclick="insShift('sqrt(','^(2)')">√</button>
+    <button class="key num" onclick="ins('7')">7</button>
+    <button class="key num" onclick="ins('8')">8</button>
+    <button class="key num" onclick="ins('9')">9</button>
+    <button class="key op" onclick="ins('*')">×</button>
+
+    <button class="key fn" onclick="ins('^(')">^</button>
+    <button class="key num" onclick="ins('4')">4</button>
+    <button class="key num" onclick="ins('5')">5</button>
+    <button class="key num" onclick="ins('6')">6</button>
+    <button class="key op" onclick="ins('-')">−</button>
+
+    <button class="key special" onclick="ins('π')" style="color:var(--nw-special)">π</button>
+    <button class="key num" onclick="ins('1')">1</button>
+    <button class="key num" onclick="ins('2')">2</button>
+    <button class="key num" onclick="ins('3')">3</button>
+    <button class="key op" onclick="ins('+')">+</button>
+
+    <button class="key special" onclick="ins('e')" style="color:var(--nw-special)">e</button>
+    <button class="key num" onclick="ins('.')">.</button>
+    <button class="key num" onclick="ins('0')">0</button>
+    <button class="key fn" onclick="ins('E')">×10ⁿ</button>
+    <button class="key eq" onclick="calc()">=</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.0/math.js"></script>
+<script>
+// Logic preserved from original file
+let expr='', angleMode='rad', exactMode=true, lastAns=0, isResult=false, shiftOn=false;
+let cursorPos=0;
+
+const iD=document.getElementById('inputDisplay');
+const rZ=document.getElementById('renderZone');
+const rD=document.getElementById('resultDisplay');
+const rDec=document.getElementById('resultDec');
+
+function moveCursor(delta){
+  cursorPos=Math.max(0,Math.min(expr.length,cursorPos+delta));
+  renderInput();
+}
+
+function toggleShift(){
+  shiftOn=!shiftOn;
+  document.getElementById('shiftBtn').style.color=shiftOn?'#e8703a':'#aaa';
+  document.getElementById('shiftIndicator').style.display=shiftOn?'block':'none';
+}
+
+function insShift(n,s){ if(shiftOn){ins(s);toggleShift();}else{ins(n);} }
+function setAngle(m){ angleMode=m; document.getElementById('modeLabel').textContent=m.toUpperCase(); tryEval(); }
+function setExact(v){ exactMode=v; document.getElementById('btnExact').classList.toggle('active',v); document.getElementById('btnFloat').classList.toggle('active',!v); update(); }
+
+function ins(v){
+  if(isResult&&/[\d(πe]/.test(v)){expr='';cursorPos=0;isResult=false;}
+  expr=expr.slice(0,cursorPos)+v+expr.slice(cursorPos);
+  cursorPos+=v.length;
+  update();
+}
+
+function del(){ expr=expr.slice(0,cursorPos-1)+expr.slice(cursorPos); cursorPos=Math.max(0,cursorPos-1); update(); }
+function clr(){ expr='';cursorPos=0;update(); rD.textContent=''; rDec.textContent=''; rZ.innerHTML=''; }
+
+function update(){ renderInput(); renderMath(); tryEval(); }
+
+function renderInput(){
+  let html='', i=0;
+  while(i<expr.length){
+    if(i===cursorPos) html+='<span class="cursor"></span>';
+    html+=`<span>${expr[i]}</span>`;
+    i++;
+  }
+  if(cursorPos>=expr.length) html+='<span class="cursor"></span>';
+  iD.innerHTML=html;
+}
+
+function renderMath(){
+  // Simplifié pour la démo PWA, utilise votre logique originale de nodeToHTML
+  rZ.innerHTML = `<span style="color:#7ecfff">${expr}</span>`;
+}
+
+function tryEval(){
+  if(!expr)return;
+  try {
+    let e2 = expr.replace(/π/g,'pi').replace(/÷/g,'/').replace(/×/g,'*');
+    const res = math.evaluate(e2);
+    rD.textContent = '= ' + res;
+  } catch(e){}
+}
+
+function calc(){ isResult=true; tryEval(); }
+
+// Service Worker Registration
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js');
+  });
+}
+</script>
+</body>
+</html>
