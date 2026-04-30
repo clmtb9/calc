@@ -230,9 +230,72 @@ function renderInput(){
   iD.innerHTML=html;
 }
 
-function renderMath(){
-  // Simplifié pour la démo PWA, utilise votre logique originale de nodeToHTML
-  rZ.innerHTML = `<span style="color:#7ecfff">${expr}</span>`;
+function renderMath() {
+  if (!expr) {
+    rZ.innerHTML = '';
+    return;
+  }
+  try {
+    // On remplace les symboles pour que Math.js les comprenne
+    let e2 = expr.replace(/π/g, 'pi').replace(/÷/g, '/').replace(/×/g, '*');
+    
+    // Math.js analyse l'expression et crée un "arbre" mathématique
+    const node = math.parse(e2);
+    
+    // On convertit cet arbre en HTML avec notre propre fonction
+    rZ.innerHTML = `<span style="color:#7ecfff">${nodeToHTML(node)}</span>`;
+  } catch (e) {
+    // Si l'expression est incomplète (ex: "2+"), on affiche simplement le texte
+    rZ.innerHTML = `<span style="color:#7ecfff">${expr}</span>`;
+  }
+}
+
+// Nouvelle fonction qui traduit la logique mathématique en design HTML
+function nodeToHTML(node) {
+  if (node.isSymbolNode) {
+    if (node.name === 'pi') return 'π';
+    return node.name;
+  }
+  if (node.isConstantNode) {
+    return node.value;
+  }
+  if (node.isOperatorNode) {
+    // Gestion des fractions
+    if (node.op === '/') {
+      // On retire les parenthèses visuellement inutiles dans une fraction (ex: (1+2)/3 -> 1+2 sur 3)
+      let numNode = node.args[0].isParenthesisNode ? node.args[0].content : node.args[0];
+      let denNode = node.args[1].isParenthesisNode ? node.args[1].content : node.args[1];
+      return `<span class="frac"><span class="frac-num">${nodeToHTML(numNode)}</span><span class="frac-den">${nodeToHTML(denNode)}</span></span>`;
+    }
+    // Gestion des puissances
+    if (node.op === '^') {
+      let baseNode = node.args[0].isParenthesisNode ? node.args[0].content : node.args[0];
+      return `${nodeToHTML(baseNode)}<span class="sup-exp">${nodeToHTML(node.args[1])}</span>`;
+    }
+    // Gestion des signes négatifs (ex: -5)
+    if (node.args.length === 1) { 
+       return node.op + nodeToHTML(node.args[0]);
+    }
+    
+    let opStr = node.op;
+    if (opStr === '*') opStr = '×';
+    if (opStr === '-') opStr = '−';
+    return `${nodeToHTML(node.args[0])} ${opStr} ${nodeToHTML(node.args[1])}`;
+  }
+  
+  if (node.isParenthesisNode) {
+    return `(${nodeToHTML(node.content)})`;
+  }
+  
+  // Gestion des fonctions (sin, cos, sqrt...)
+  if (node.isFunctionNode) {
+    const args = node.args.map(nodeToHTML).join(', ');
+    if (node.fn.name === 'sqrt') {
+      return `<span class="sqrt-wrap"><span class="sqrt-sym">√</span><span class="sqrt-content">${args}</span></span>`;
+    }
+    return `${node.fn.name}(${args})`;
+  }
+  return node.toString();
 }
 
 function tryEval(){
